@@ -29,6 +29,8 @@ n_m1 = 3.47  # Refractive index of Sphere 1 (constant)
 n_m2 = 2.41  # Refractive index of Sphere 2 (constant)
 r1 = 90e-9  # Radius of sphere 1 in meters
 r2 = 65e-9  # Radius of sphere 2 in meters
+n_m = 1.0  # Background index
+gaps = np.array([10, 20, 40, 60, 80]) * 1e-9
 wavelength_simulation = np.linspace(500, 1000, 400) * 1e-9  # Wavelength grid (500 nm to 1000 nm)
 
 # Mie Coefficient Calculation for constant refractive index
@@ -267,3 +269,84 @@ condition_number_data.to_csv(os.path.join(data_dir, "condition_numbers.csv"), in
 
 # Show the figure
 plt.show()
+
+#Step 4:Spectrum to plot (normalized extinction proxy)
+#Material Ingestion (Track 2: c-Si)
+try:
+    data = pd.read_csv(os.path.join(data_dir, 'Wang-25C.csv'))
+    n_interp = interp1d(data['Wavelength']*1e-9, data['n'], kind='cubic', fill_value="extrapolate")
+    k_interp = interp1d(data['Wavelength']*1e-9, data['k'], kind='cubic', fill_value="extrapolate")
+    n_si = n_interp(wavelength_simulation) + 1j * k_interp(wavelength_simulation)
+except FileNotFoundError:
+    print("Warning: c-Si data not found. Falling back to Track 1 constant indices.")
+    n_si = np.full_like(wavelength_simulation, 3.47 + 0j) 
+
+#  Physics Functions :Converts Mie a1 to polarizability alpha
+def get_alpha_from_mie(radius, wvl, n_sphere):
+    k = 2 * np.pi * n_m / wvl
+    # Simplified a1 for dielectric sphere
+    m = n_sphere / n_m
+    x = k * radius
+    a1 = (2j/3) * (x**3) * (m**2 - 1) / (m**2 + 2) # Quasi-static approximation
+    # Conversion formula from PDF [cite: 71, 73]
+    alpha = a1 * (3 * np.pi * 1j) / (k**3)
+    return alpha
+
+# Dyadic Green function
+def dyadic_G(r_vec, wvl):
+    R = np.linalg.norm(r_vec)
+    R_hat = r_vec / R
+    k = 2 * np.pi * n_m / wvl
+    exp_term = np.exp(1j * k * R) / (4 * np.pi * R**3)
+    term1 = (k*R)**2 * (np.eye(3) - np.outer(R_hat, R_hat))
+    term2 = (1 - 1j*k*R) * (3*np.outer(R_hat, R_hat) - np.eye(3))
+    return exp_term * (term1 + term2)
+
+#Coupled-Dipole Solver
+def solve_dimer(wvl, gap, n1, n2, polarization='x'):
+    d_dist = r1 + r2 + gap
+    r01, r02 = np.array([-d_dist/2, 0, 0]), np.array([d_dist/2, 0, 0])
+    k_vec = (2 * np.pi * n_m / wvl) * np.array([0, 0, 1])  
+    alpha1 = get_alpha_from_mie(r1, wvl, n1)
+    alpha2 = get_alpha_from_mie(r2, wvl, n2)
+    G12 = dyadic_G(r01 - r02, wvl)
+    
+    # E_inc polarization 
+    E0_vec = np.array([1, 0, 0]) if polarization == 'x' else np.array([0, 1, 0])
+    E_inc1 = E0_vec * np.exp(1j * np.dot(k_vec, r01))
+    E_inc2 = E0_vec * np.exp(1j * np.dot(k_vec, r02))
+    
+    # Matrix: [I, -alpha1*G; -alpha2*G, I] * [d1; d2] = [alpha1*E1; alpha2*E2]
+    M = np.eye(6, dtype=complex)
+    M[0:3, 3:6] = -alpha1 * G12
+    M[3:6, 0:3] = -alpha2 * G12
+    rhs = np.concatenate([alpha1 * E_inc1, alpha2 * E_inc2])
+    
+    sol = solve(M, rhs)
+    d1, d2 = sol[0:3], sol[3:6]
+    
+    # S(lambda) proxy
+    S = np.imag(np.dot(np.conj(E_inc1), d1) + np.dot(np.conj(E_inc2), d2))
+    return S, np.linalg.cond(M)
+
+# Parametric Sweep: Gap and Polarizibility
+results = {'x': [], 'y': []}
+for pol in ['x', 'y']:
+    plt.figure(figsize=(8, 6))
+    for g in gaps:
+        spectrum = [solve_dimer(w, g, n_si[i], 2.41, pol)[0] for i, w in enumerate(wavelength_simulation)]
+        results[pol].append(spectrum)
+        plt.plot(wavelength_simulation*1e9, spectrum, label=f'g={g*1e9:.0f}nm')
+    
+    # Improved plot characteristics
+    plt.title(f"Normalized Extinction Proxy: Polarization {pol.upper()}", fontsize=14, fontweight='bold')
+    plt.xlabel("Wavelength (nm)", fontsize=12, fontweight='bold')
+    plt.ylabel("S(λ) (Normalized Extinction Proxy)", fontsize=12, fontweight='bold')
+    plt.tick_params(axis='both', which='major', labelsize=12, width=2)
+    for label in (plt.gca().get_xticklabels() + plt.gca().get_yticklabels()):
+        label.set_fontweight('bold')
+    
+    plt.legend(fontsize=14, prop={'weight': 'bold'})
+    plt.grid(False)  # No grid
+    plt.savefig(f"figs/sweep_pol_{pol}.pdf")
+    plt.show()
