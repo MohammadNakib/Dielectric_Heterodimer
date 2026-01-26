@@ -394,8 +394,7 @@ for pol in ['x', 'y']:
         spectrum = [solve_dimer(w, g, n_si[i], 2.41, pol)[0] for i, w in enumerate(wavelength_simulation)]
         results[pol].append(spectrum)
         plt.plot(wavelength_simulation*1e9, spectrum, label=f'g={g*1e9:.0f}nm')
-    
-    # Improved plot characteristics
+    #Plot
     plt.title(f"Normalized Extinction Proxy: Polarization {pol.upper()}", fontsize=14, fontweight='bold')
     plt.xlabel("Wavelength (nm)", fontsize=12, fontweight='bold')
     plt.ylabel("S(λ) (Normalized Extinction Proxy)", fontsize=12, fontweight='bold')
@@ -404,6 +403,6 @@ for pol in ['x', 'y']:
         label.set_fontweight('bold')
     
     plt.legend(fontsize=14, prop={'weight': 'bold'})
-    plt.grid(False)  # No grid
+    plt.grid(False) 
     plt.savefig(f"figs/sweep_pol_{pol}.pdf")
     plt.show()
