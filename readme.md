@@ -83,11 +83,6 @@ Figures will be saved in the `figs` folder, and data will be saved in the `data`
 * **Wavelengths**: The wavelength range is set from 500 nm to 1000 nm. Modify the `wavelength_simulation` array to change the wavelength range or resolution.
 * **Data File**: The `Wang-25C.csv` file must be present in the directory for the code to work properly. It contains the refractive index and extinction coefficient data for crystalline silicon.
 * **Plot Customization**: The plots are customized with bold axis labels, grid lines are removed for clarity, and a rectangular border is drawn around the figures.
-
-### References
-
-* The formulas for calculating Mie coefficients are based on standard Mie theory for dielectric spheres.
-* The Dyadic Green's function implementation follows a commonly used form for coupled-dipole models.
-
 ---
+
 
