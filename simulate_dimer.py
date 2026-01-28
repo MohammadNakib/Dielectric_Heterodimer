@@ -263,8 +263,6 @@ def solve_dimer_system(alpha1_arr, alpha2_arr, r1_pos, r2_pos, wl_arr, pol_vec):
         
     return S_lambda
 
-
-
 # Normalized Extinction Proxy
 
 gaps_nm = [10, 20, 40, 60, 80]
@@ -380,12 +378,6 @@ except Exception as e:
     print(f"Fano fit failed: {e}")
 
 print("\n--- Track 1 Complete. Check 'figs/' folder. ---")
-
-
-
-
-
-
 
 
 # Track 2: Mie Coefficient Calculation for Crystalline Si Dispersion (for both spheres)
